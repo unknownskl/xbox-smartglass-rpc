@@ -1,0 +1,23 @@
+  - platform: rest
+    name: mediacenter
+    resource: "http://127.0.0.1:8000/api/v1/status"
+    value_template: "{{ value_json.mode }}"
+    json_attributes:
+    - status
+    - mode
+    - application
+    - build_number
+  - platform: template
+    sensors:
+      mediacenter_mode:
+        value_template: '{{ states.sensor.mediacenter.attributes.mode }}'
+        icon_template: 'mdi:television'
+        entity_id: sensor.mediacenter
+      mediacenter_application:
+        value_template: '{{ states.sensor.mediacenter.attributes.application }}'
+        icon_template: 'mdi:television'
+        entity_id: sensor.mediacenter
+      mediacenter_buildnumber:
+        value_template: '{{ states.sensor.mediacenter.attributes.build_number }}'
+        icon_template: 'mdi:arrow-up-bold-circle-outline'
+        entity_id: sensor.mediacenter

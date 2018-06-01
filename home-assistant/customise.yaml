@@ -1,0 +1,19 @@
+switch.mediacenter:
+  friendly_name: Xbox One
+  icon: mdi:xbox
+
+sensor.mediacenter:
+  friendly_name: Xbox One Status
+  icon: mdi:xbox
+
+sensor.mediacenter_mode:
+  friendly_name: Mediacenter Mode
+  icon: mdi:face
+
+sensor.mediacenter_application:
+  friendly_name: Mediacenter Application
+  icon: mdi:xbox-controller
+
+sensor.mediacenter_buildnumber:
+  friendly_name: Xbox One Dashboard version
+  icon: mdi:xbox-controller

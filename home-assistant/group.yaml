@@ -1,0 +1,9 @@
+xbox:
+  name: Xbox One
+  view: no
+  entities:
+  - switch.mediacenter
+  - sensor.mediacenter
+  - sensor.mediacenter_mode
+  - sensor.mediacenter_application
+  - sensor.mediacenter_buildnumber
