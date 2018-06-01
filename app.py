@@ -12,6 +12,112 @@ from xbox.sg.manager import InputManager, TextManager, MediaManager
 hostName = "0.0.0.0"
 hostPort = 8000
 
+class XboxState:
+    def __init__(self):
+        self.status = False
+        self.active_titles = []
+        self.mode = 'off'
+        self.application = 'none'
+        self.build = 0
+        self.lastUpdate = 0
+        self.lastUpdate_status = 0
+
+    def setStatus(self, status):
+        print("[XboxState.setStatus] Set status to %s" % status)
+        self.status = status
+        self.lastUpdate_status = time.time()
+        return True
+
+    def setTitles(self, titles):
+        print("[XboxState.setTitles] Updating titles")
+        activeTitles = []
+        for Title in titles:
+            titleStruct = {
+                'title_id': Title.title_id,
+                'focus': Title.disposition.has_focus,
+                'uam_id': Title.aum,
+            }
+
+            type = Title.aum.split('!')[1]
+            name = Title.aum.split('!')[0]
+
+            if type == 'App':
+                if name == '4DF9E0F8.Netflix_mcm4njqhnhss8':
+                    self.mode = "video"
+                    self.application = "netflix"
+
+                elif name == 'XBMCFoundation.Kodi_4n2hpmxwrvr6p':
+                    self.mode = "video"
+                    self.application = "kodi"
+
+                elif name == 'SpotifyAB.SpotifyMusic-forXbox_zpdnekdrzrea0':
+                    self.mode = "audio"
+                    self.application = "spotify"
+
+                else:
+                    self.mode = "app"
+                    self.application = name+"!App"
+
+            elif type == 'Microsoft.Xbox.LiveTV.Application':
+                self.mode = "tv"
+                self.application = "livetv"
+
+            elif type == 'Xbox.Dashboard.Application':
+                self.mode = "standby"
+                self.application = "dashboard"
+
+            elif type == 'Xbox.Settings.Application':
+                self.mode = "standby"
+                self.application = "settings"
+
+            else:
+                self.mode = "game"
+                self.application = name+"!"+type
+
+            activeTitles.append(titleStruct)
+
+        self.active_titles = activeTitles
+        self.lastUpdate = time.time()
+        return self.active_titles
+
+    def setBuild(self, build):
+        print("[XboxState.setBuild] Set build to %s" % build)
+        self.build = build
+        self.lastUpdate = time.time()
+        return True
+
+    def getStatus(self):
+        return self.status
+
+    def getTitles(self):
+        return self.active_titles
+
+    def getMode(self):
+        return self.mode
+
+    def getApplication(self):
+        return self.application
+
+    def getBuild(self):
+        return self.build
+
+    def needsUpdate(self, timeout = 60):
+        if self.lastUpdate > (time.time()-timeout):
+            print("[XboxState.needsUpdate] Cache expires in %d seconds, return False" % (self.lastUpdate-(time.time()-timeout)))
+            return False
+        else:
+            print("[XboxState.needsUpdate] Needs an update, return True")
+            return True
+
+    def statusNeedsUpdate(self, timeout = 30):
+        if self.lastUpdate_status > (time.time()-timeout):
+            print("[XboxState.statusNeedsUpdate] Cache expires in %d seconds, return False" % (self.lastUpdate_status-(time.time()-timeout)))
+            return False
+        else:
+            print("[XboxState.statusNeedsUpdate] Needs an update, return True")
+            return True
+
+
 class Xbox:
     def __init__(self):
         self.console = False
@@ -39,23 +145,29 @@ class Xbox:
 
         return self.console_data
 
-    def fetchMediaStatus(self, tries = 1):
-
-        print("[Xbox.fetchMediaStatus] called (Try #%d)" % tries)
-        if tries == 5:
-            return False
-
-        if self.console.title_id == None:
-            self.console.protocol.serve_forever()
-            return self.fetchMediaStatus(tries = tries+1)
-        else:
-            return self.console.media_state
+    # def fetchMediaStatus(self, tries = 1):
+    #
+    #     print("[Xbox.fetchMediaStatus] called (Try #%d)" % tries)
+    #     if tries == 5:
+    #         return False
+    #
+    #     if self.console.title_id == None:
+    #         self.console.protocol.serve_forever()
+    #         return self.fetchMediaStatus(tries = tries+1)
+    #     else:
+    #         return self.console.media_state
+    #
 
     def onMediaState(self, state):
         print(state)
         print("[Xbox.onMediaState] called (State: %s)" % state)
         self.console.protocol.shutdown()
         return
+
+    def onTimeout(self):
+        self.console.protocol.stop()
+        print("[Xbox.onTimeout] Connection timed out")
+        self.console = False
 
     def getInstance(self, mode = 'default', connect = True):
 
@@ -77,28 +189,34 @@ class Xbox:
         )
 
         if mode == 'media':
-            print("[Xbox.getInstance] Activated MediaManager")
+            print("[Xbox.getInstance] Activated MediaManager (beta)")
             self.console.add_manager(MediaManager)
             self.console.media.on_media_state += self.onMediaState
 
         if connect == False:
             return self.console
         else:
-            print("[Xbox.getInstance] Connecting to Xbox")
-            self.console.connect()
+            print("[Xbox.getInstance] Checking if console data is still up to date")
+            console = self.findDevice()
+            if console != False:
+                print("[Xbox.getInstance] Connecting to Xbox")
+                state = self.console.connect()
 
-            if self.console.connection_state == ConnectionState.Connected:
-                print("[Xbox.getInstance] Xbox Connected")
-                self.console.wait(0.5)
-                connected = True
+                if state == ConnectionState.Connected:
+                    print("[Xbox.getInstance] Xbox Connected")
+                    self.console.wait(0.5)
+                    connected = True
+                else:
+                    print("[Xbox.getInstance] [ERROR] Could not connect to Xbox")
+                    conected = False
             else:
-                print("[Xbox.getInstance] [ERROR] Could not connect to Xbox")
-                conected = False
+                print("[Xbox.getInstance] Xbox not found on network")
+                connected = False
 
-            if connected == True:
-                return self.console
-            else:
-                return False
+        if connected == True:
+            return self.console
+        else:
+            return False
 
     def discovery(self, timeout, addr):
         return self.do_discovery(addr = addr, tries = timeout)
@@ -123,14 +241,22 @@ class Xbox:
 
         if os.environ['XBOX_IP'] != "127.0.0.1":
             print("[Xbox.power_on] Booting xbox from config settings (%s, %s)" % (os.environ['XBOX_IP'], os.environ['XBOX_LIVEID']))
-            Console.power_on(os.environ['XBOX_LIVEID'], os.environ['XBOX_IP'], tries=20)
+            Console.power_on(os.environ['XBOX_LIVEID'], os.environ['XBOX_IP'], tries=10)
+            time.sleep(1)
+            Console.power_on(os.environ['XBOX_LIVEID'], os.environ['XBOX_IP'], tries=10)
+            time.sleep(1)
+            Console.power_on(os.environ['XBOX_LIVEID'], os.environ['XBOX_IP'], tries=10)
             data = True
 
         else:
             console = self.getInstance(connect = False);
             if console != False:
                 print("[Xbox.power_on] Booting xbox from discovery settings(%s, %s)" % (self.console_data.get("address"), self.console.get("liveid")))
-                Console.power_on(self.console_data.get("liveid"), self.console.get("address"), tries=20)
+                Console.power_on(self.console_data.get("liveid"), self.console.get("address"), tries=10)
+                time.sleep(1)
+                Console.power_on(self.console_data.get("liveid"), self.console.get("address"), tries=10)
+                time.sleep(1)
+                Console.power_on(self.console_data.get("liveid"), self.console.get("address"), tries=10)
                 data = True
             else:
                 data = ['No device found in cache. Turn on your xbox and run /api/v1/discovery']
@@ -140,6 +266,7 @@ class Xbox:
     def power_off(self):
         self.console.power_off()
         self.console.wait(1)
+        self.console = False
         return True
 
     def close(self):
@@ -195,87 +322,47 @@ class MyServer(BaseHTTPRequestHandler):
                 self.sendResponse(data)
 
         elif self.path == "/api/v1/status":
-            console = Xbox.getInstance();
-            print(console)
-            if console != False:
-                print("[Http.Get] Returning online console status")
-                status = console.console_status()
 
-                mediaMode = None
-                mediaApplication = None
+            if XboxState.needsUpdate() == True:
+                console = Xbox.getInstance();
+                print(console)
+                if console != False:
+                    print("[Http.Get] Returning online console status")
+                    status = console.console_status()
 
-                activeTitles = []
-                for Title in status.active_titles:
-                    titleStruct = {
-                        'title_id': Title.title_id,
-                        'focus': Title.disposition.has_focus,
-                        'uam_id': Title.aum,
+                    XboxState.setStatus(True)
+                    XboxState.setTitles(status.active_titles)
+                    XboxState.setBuild(status.build_number)
+
+                    print("[Http.Get] active_tiles: %s" % XboxState.getTitles() )
+                    print("[Http.Get] mode: %s" % XboxState.getMode() )
+                    print("[Http.Get] application: %s" % XboxState.getApplication() )
+                    print("[Http.Get] build_number: %s" % XboxState.getBuild() )
+                    data = {
+                        'status': XboxState.getStatus(),
+                        'build_number': XboxState.getBuild(),
+                        'active': XboxState.getTitles(),
+                        'mode': XboxState.getMode(),
+                        'application': XboxState.getApplication()
                     }
-
-                    type = Title.aum.split('!')[1]
-                    name = Title.aum.split('!')[0]
-
-                    if type == 'App':
-                        if name == '4DF9E0F8.Netflix_mcm4njqhnhss8':
-                            mediaMode = "video"
-                            mediaApplication = "netflix"
-
-                        elif name == 'XBMCFoundation.Kodi_4n2hpmxwrvr6p':
-                            mediaMode = "video"
-                            mediaApplication = "kodi"
-
-                        elif name == 'SpotifyAB.SpotifyMusic-forXbox_zpdnekdrzrea0':
-                            mediaMode = "audio"
-                            mediaApplication = "spotify"
-
-                        elif name == 'SpotifyAB.SpotifyMusic-forXbox_zpdnekdrzrea0':
-                            mediaMode = "audio"
-                            mediaApplication = "spotify"
-
-                        else:
-                            mediaApplication = name
-                            mediaMode = "app"
-
-                    elif type == 'Microsoft.Xbox.LiveTV.Application':
-                        mediaMode = "tv"
-                        mediaApplication = "livetv"
-
-                    elif type == 'Xbox.Dashboard.Application':
-                        mediaMode = "standby"
-                        mediaApplication = "dashboard"
-
-                    elif type == 'Xbox.Settings.Application':
-                        mediaMode = "standby"
-                        mediaApplication = "settings"
-
-                    else:
-                        mediaMode = "game"
-                        mediaApplication = name
-
-                    activeTitles.append(titleStruct)
-
-                print("[Http.Get] active_tiles: %s" % activeTitles )
-                print("[Http.Get] mode: %s" % mediaMode )
-                print("[Http.Get] application: %s" % mediaApplication )
-                print("[Http.Get] build_number: %s" % status.build_number )
-                data = {
-                    'status': 'online',
-                    'build_number': status.build_number,
-                    'active': activeTitles,
-                    'mode': mediaMode,
-                    'application': mediaApplication
-                }
-                Xbox.close()
+                    Xbox.close()
+                else:
+                    print("[Http.Get] Returning offline console status")
+                    data = {
+                        'status': 'offline',
+                        'build_number': XboxState.getBuild(),
+                        'active': [],
+                        'mode': 'off',
+                        'application': 'none'
+                    }
             else:
-                print("[Http.Get] Returning offline console status")
                 data = {
-                    'status': 'offline',
-                    'build_number': False,
-                    'active': [],
-                    'mode': 'off',
-                    'application': 'none'
+                    'status': XboxState.getStatus(),
+                    'build_number': XboxState.getBuild(),
+                    'active': XboxState.getTitles(),
+                    'mode': XboxState.getMode(),
+                    'application': XboxState.getApplication()
                 }
-
             self.sendResponse(data)
 
         elif self.path[:15] == "/api/v1/launch/":
@@ -372,20 +459,22 @@ class MyServer(BaseHTTPRequestHandler):
 
             data = {
                 'consoles_found': consolesFound,
-                'console_data': {
-                    "name": Xbox.console_data.get("name"),
-                    "address": Xbox.console_data.get("address"),
-                    "liveid": Xbox.console_data.get("liveid"),
-                }
+                'console_data': consoleData
             }
             self.sendResponse(data)
+
         elif self.path == "/api/v1/switch":
-            console = Xbox.getInstance();
-            if console == False:
-                data = { 'status': False }
+            if XboxState.statusNeedsUpdate() == True:
+                console = Xbox.getInstance();
+                if console == False:
+                    XboxState.setStatus(False)
+                    data = { 'status': False }
+                else:
+                    XboxState.setStatus(True)
+                    data = { 'status': True }
+                    Xbox.close()
             else:
-                data = { 'status': True }
-                Xbox.close()
+                data = { 'status': XboxState.getStatus() }
 
             self.sendResponse(data)
         elif self.path == "/":
@@ -412,29 +501,58 @@ class MyServer(BaseHTTPRequestHandler):
             content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
             post_data = self.rfile.read(content_length) # <--- Gets the data itself
             json_data = json.loads(post_data)
+
             print("[Http.Post] %s payload (%s)" % (self.path, json_data))
             new_state = json_data.get("active")
-            print(new_state)
+            print("[Http.Post] set status to: %s" % new_state)
 
-            console = Xbox.getInstance();
-            if console == False:
-                # Device is off
-                if new_state == True:
-                    print("[Http.Post] Turning on Xbox")
-                    Xbox.power_on()
-                    time.sleep(10) # Sleep 10 seconds to let the xbox turn off so the status is the actual status on next request
-                    data = { 'status': True }
+            if XboxState.statusNeedsUpdate() == True:
+                print("[Http.Post] Turning off console")
+                console = Xbox.getInstance();
+                if console == False:
+                    # Device is off
+                    if new_state == True:
+                        print("[Http.Post] Turning on console")
+                        Xbox.power_on()
+                        time.sleep(10) # Sleep 10 seconds to let the xbox turn off so the status is the actual status on next request
+                        data = { 'status': True }
+                    else:
+                        data = { 'status': False }
                 else:
-                    data = { 'status': False }
+                    # Device is on
+                    if new_state != True:
+                        print("[Http.Post] Turning off console")
+                        Xbox.power_off()
+                        time.sleep(10) # Sleep 10 seconds to let the xbox turn off so the status is the actual status on next request
+                        data = { 'status': False }
+                    else:
+                        data = { 'status': True }
             else:
-                # Device is on
-                if new_state != True:
-                    print("[Http.Post] Turning off Xbox")
-                    Xbox.power_off()
-                    time.sleep(10) # Sleep 10 seconds to let the xbox turn off so the status is the actual status on next request
-                    data = { 'status': False }
+                if XboxState.getStatus() == True:
+                    # Device is on
+                    if new_state == False:
+                        print("[Http.Post] Turning off console")
+                        console = Xbox.getInstance();
+                        if console != False:
+                            Xbox.power_off()
+                            XboxState.setStatus(False)
+                            print("[Http.Post] Turned off console")
+                        else:
+                            print("[Http.Post] Could not turn off console")
                 else:
-                    data = { 'status': True }
+                    # Device is off
+                    if new_state == True:
+                        print("[Http.Post] Turning on console")
+                        Xbox.power_on()
+                        console = Xbox.getInstance();
+                        if console != False:
+                            print("[Http.Post] Turned on console")
+                            XboxState.setStatus(True)
+                        else:
+                            print("[Http.Post] Could not turn on console")
+                            XboxState.setStatus(False)
+
+            data = { "status": XboxState.getStatus() }
 
             self.sendResponse(data)
         else:
@@ -452,6 +570,7 @@ class MyServer(BaseHTTPRequestHandler):
 
 myServer = HTTPServer((hostName, hostPort), MyServer)
 Xbox = Xbox()
+XboxState = XboxState()
 
 print(time.asctime(), "Server Starts - %s:%s" % (hostName, hostPort))
 
