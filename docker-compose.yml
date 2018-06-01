@@ -1,0 +1,10 @@
+version: '2'
+
+services:
+  xbox:
+    image: xbox-rpc
+    ports:
+    - 8000:8000
+    environment:
+    - XBOX_IP=192.168.2.5
+    - XBOX_LIVEID=FD00000000000000
