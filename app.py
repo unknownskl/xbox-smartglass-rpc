@@ -6,8 +6,9 @@ import json
 import os
 
 from xbox.sg.console import Console
-from xbox.sg.enum import DeviceStatus, ConnectionState, GamePadButton, MediaPlaybackStatus
+from xbox.sg.enum import DeviceStatus, ConnectionState, GamePadButton, MediaPlaybackStatus, MediaControlCommand
 from xbox.sg.manager import InputManager, TextManager, MediaManager
+from xbox.stump.manager import StumpManager
 
 hostName = "0.0.0.0"
 hostPort = 8000
@@ -188,11 +189,6 @@ class Xbox:
             public_key = self.console_data.get("public_key"),
         )
 
-        if mode == 'media':
-            print("[Xbox.getInstance] Activated MediaManager (beta)")
-            self.console.add_manager(MediaManager)
-            self.console.media.on_media_state += self.onMediaState
-
         if connect == False:
             return self.console
         else:
@@ -200,6 +196,17 @@ class Xbox:
             console = self.findDevice()
             if console != False:
                 print("[Xbox.getInstance] Connecting to Xbox")
+
+                if mode == 'media':
+                    print("[Xbox.getInstance] Activated MediaManager (beta)")
+                    self.console.add_manager(MediaManager)
+                    #self.console.media.on_media_state += self.onMediaState
+
+                if mode == 'stump':
+                    print("[Xbox.getInstance] Activated StumpManager (beta)")
+                    self.console.add_manager(StumpManager)
+                    #self.console.media.on_media_state += self.onMediaState
+
                 state = self.console.connect()
 
                 if state == ConnectionState.Connected:
@@ -407,6 +414,50 @@ class MyServer(BaseHTTPRequestHandler):
         #     self.sendResponse(data)
         #     Xbox.close()
 
+        elif self.path == "/api/v1/ir":
+            console = Xbox.getInstance(mode = 'stump');
+            tvConfig = console.request_stump_configuration()
+            print(tvConfig)
+
+            devices = []
+            for device_config in tvConfig.params:
+                buttonLinks = {}
+                for button in device_config.buttons:
+                    buttonLinks[button] = {
+                        'url': '/api/v1/ir/%s/%s' % (device_config.device_id, button),
+                        'value': device_config.buttons[button]
+                    }
+
+                devices.append({
+                    'type': device_config.device_type,
+                    'brand': device_config.device_brand,
+                    'model': device_config.device_model,
+                    'id': device_config.device_id,
+                    'buttons': buttonLinks
+                })
+
+
+            self.sendResponse(devices)
+
+        elif self.path[:11] == "/api/v1/ir/":
+            deviceId = self.path[11];
+            if deviceId in '0123':
+                button = self.path[13:]
+            else:
+                button = self.path[11:]
+                deviceId = False
+
+            console = Xbox.getInstance(mode = 'stump');
+            if deviceId != False:
+                command = console.send_stump_key(button, deviceId)
+            else:
+                command = console.send_stump_key(button)
+
+            self.sendResponse({
+                'device_id': deviceId,
+                'button': button
+            })
+
         elif self.path[:13] == "/api/v1/media":
             action = self.path[14:]
 
@@ -459,7 +510,8 @@ class MyServer(BaseHTTPRequestHandler):
 
             data = {
                 'consoles_found': consolesFound,
-                'console_data': consoleData
+                'console_data': consoleData,
+                #'xbox_state': XboxState
             }
             self.sendResponse(data)
 
