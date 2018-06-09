@@ -9,6 +9,6 @@ EXPOSE 8000/tcp
 ENV XBOX_IP 127.0.0.1
 ENV XBOX_LIVEID FD00000000000000
 
-COPY app.py ./
+COPY app/ ./
 
 CMD [ "python", "-u", "./app.py" ]

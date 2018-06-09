@@ -1,16 +1,20 @@
 import json
 from gevent.pywsgi import WSGIServer
 from console.xbox import Xbox
+from api.cache import ApiCache
 
 def HttpRouter(env, start_response):
-    instance = Router(env, start_response)
+    apiCache = ApiCache()
+
+    instance = Router(env, start_response, apiCache)
     return instance.handle()
 
 class Router:
-    def __init__(self, env, start_response):
+    def __init__(self, env, start_response, apiCache):
         self._env = env
         self._start_response = start_response
         self._status = False
+        self._cache = apiCache
 
     def mapRoute(self, path):
         if path == '/':
@@ -18,6 +22,9 @@ class Router:
 
         if path == '/api/v1/discovery':
             return self.action_discovery()
+
+        if path == '/api/v1/debug':
+            return self.action_debug()
 
         return False
 
@@ -55,8 +62,24 @@ class Router:
         found = []
         for console in consoles:
             found.append(consoles[console].to_json())
+            self._cache.foundConsole(console = consoles[console])
 
         return {
             'status': 200,
             'response': found
+        }
+
+    def action_debug(self):
+        cache_consoles = self._cache.getConsoles()
+        return_consoles = []
+        for console in cache_consoles:
+            return_consoles.append(cache_consoles[console].to_json())
+
+        return {
+            'status': 200,
+            'response': {
+                'cache': {
+                    'consoles': return_consoles
+                }
+            }
         }
