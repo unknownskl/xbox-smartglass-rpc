@@ -13,3 +13,11 @@ class ApiCache:
     def getConsoles(self):
         print('[ApiCache.getConsoles] Getting consoles from cache')
         return ApiCache._consoles
+
+    def findConsoleByLiveId(self, liveId):
+        consoles = self.getConsoles()
+        for console in consoles:
+            if consoles[console]._console.liveid == liveId:
+                return consoles[console]
+
+        return False;

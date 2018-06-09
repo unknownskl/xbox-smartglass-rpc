@@ -1,4 +1,5 @@
 import os
+import time
 from xbox.sg.console import Console
 from xbox.sg.enum import DeviceStatus, ConnectionState, GamePadButton, MediaPlaybackStatus, MediaControlCommand
 from xbox.sg.manager import InputManager, TextManager, MediaManager
@@ -48,6 +49,7 @@ class Xbox:
 
         self._console.on_connection_state += lambda _: self._on_refresh_connection()
         self._console.on_console_status += lambda _: self._on_refresh_status()
+        self._console.media.on_media_state += lambda _: self._on_refresh_media()
 
         state = self._console.connect()
 
@@ -60,9 +62,50 @@ class Xbox:
             self.state.setConnected(False)
             return False
 
+    def power_off(self):
+        if self.state.isConnected() == True:
+            print("[Xbox.power_off] Turning off Xbox: %s" % self.getName())
+            self._console.power_off()
+            return True
+        else:
+            return False
+
+    def power_on(liveId, tries = 5):
+        print("[Xbox.power_on] Booting Xbox with liveID: %s (%s)" % (liveId, os.environ['XBOX_IP']))
+        for num in range(1, tries):
+            Console.power_on(liveId, os.environ['XBOX_IP'], tries=20)
+            print('[Xbox.power_on] Broadcasting packet (%s/%s)' % (num, tries))
+
+        consoles = Xbox.discover()
+        for console in consoles:
+            if consoles[console]._console.liveid == liveId:
+                return consoles[console]
+
+        return False
+
+    def launch_uri(self, uri):
+        if self.state.isConnected() == True:
+            self._console.launch_title(uri)
+            return True
+        else:
+            return False
+
+    def get_ir_configuration(self):
+        if self.state.isConnected() == True:
+            configuration = self._console.request_stump_configuration()
+
+            return configuration
+        else:
+            return False
+
     def _on_refresh_status(self):
         print("[Xbox._on_refresh_status] Got status update from Xbox: %s" % self.getName())
         self.state.setTitles(self._console.console_status.get('active_titles'))
+
+    def _on_refresh_media(self):
+        print("[Xbox._on_refresh_media] Got status update from Xbox: %s" % self.getName())
+        print("[Xbox._on_refresh_media] @TODO: Implement this function")
+        print(self._console.media_state)
 
     def _on_refresh_connection(self):
         if self._console.connection_state == ConnectionState.Connected:

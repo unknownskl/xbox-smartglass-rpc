@@ -16,15 +16,22 @@ Currently implemented:
 | XBOX_IP     | 127.0.0.1        |
 | XBOX_LIVEID | FD00000000000000 |
 
-| URI                       | Description                               |
-|---------------------------|-------------------------------------------|
-| /                         | Returns all api methods available         |
-| /api/v1/discovery         | Returns all active Xbox on the network    |
-| /api/v1/poweron           | Turn on the Xbox One.                     |
-| /api/v1/poweroff          | Turn off the Xbox One.                    |
-| /api/v1/launch/{titleid}  | Launch Title on Xbox One (See list below) |
-| /api/v1/media             | Returns all media control actions         |
-| /api/v1/media/{action}    | Perform media control action              |
+| URI                                       | Description                                             |
+|-------------------------------------------|---------------------------------------------------------|
+| /                                         | Returns all api methods available                       |
+| /api/v1/discovery                         | Returns all active Xbox on the network                  |
+| /api/v1/status                            | Returns the status of the server and connected clients  |
+| /api/v1/debug                             | Return debug information about set variables and status |
+| /api/v1/{LiveID}/poweron                  | Turn on the Xbox One.                                   |
+| /api/v1/{LiveID}/poweroff                 | Turn off the Xbox One.                                  |
+| /api/v1/{LiveID}/launch/{URI}             | Launch Title on Xbox One (See list below)               |
+| /api/v1/{LiveID}/media                    | Returns all media control actions                       |
+| /api/v1/{LiveID}/media/{action}           | Perform media control action                            |
+| /api/v1/{LiveID}/ir                       | Returns all controllable ir devices                     |
+| /api/v1/{LiveID}/ir/({DeviceID}/){action} | Perform an action on a ir device                        |
+| /api/v1/{LiveID}/tv                       | Query for tv settings                                   |
+
+* LiveID is not your email address!
 
 ### Supported TitleID's
 - spotify:track... (Navigate to Spotify and show track)

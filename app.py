@@ -392,6 +392,8 @@ class MyServer(BaseHTTPRequestHandler):
 
             self.sendResponse(data)
 
+
+
         # Disabled due not working
         # elif self.path[:19] == "/api/v1/mediastatus":
         #     console = Xbox.getInstance(mode = 'media');

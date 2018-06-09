@@ -19,6 +19,16 @@ class XboxState:
     def isConnected(self):
         return self.connected
 
+    def setMode(self, mode):
+        if self.mode != mode:
+            print("[XboxState.setMode] Changing mode to: %s" % mode)
+            self.mode = mode
+
+    def setApplication(self, application):
+        if self.application != application:
+            print("[XboxState.setMode] Changing application to: %s" % application)
+            self.application = application
+
     def setTitles(self, titles):
         print("[XboxState.setTitles] Updating titles")
         activeTitles = []
@@ -34,36 +44,36 @@ class XboxState:
 
             if type == 'App':
                 if name == '4DF9E0F8.Netflix_mcm4njqhnhss8':
-                    self.mode = "video"
-                    self.application = "netflix"
+                    self.setMode("video")
+                    self.setApplication("netflix")
 
                 elif name == 'XBMCFoundation.Kodi_4n2hpmxwrvr6p':
-                    self.mode = "video"
-                    self.application = "kodi"
+                    self.setMode("video")
+                    self.setApplication("kodi")
 
                 elif name == 'SpotifyAB.SpotifyMusic-forXbox_zpdnekdrzrea0':
-                    self.mode = "audio"
-                    self.application = "spotify"
+                    self.setMode("audio")
+                    self.setApplication("spotify")
 
                 else:
-                    self.mode = "app"
-                    self.application = name+"!App"
+                    self.setMode("app")
+                    self.setApplication(name+"!App")
 
             elif type == 'Microsoft.Xbox.LiveTV.Application':
-                self.mode = "tv"
-                self.application = "livetv"
+                self.setMode("tv")
+                self.setApplication("livetv")
 
             elif type == 'Xbox.Dashboard.Application':
-                self.mode = "standby"
-                self.application = "dashboard"
+                self.setMode("standby")
+                self.setApplication("dashboard")
 
             elif type == 'Xbox.Settings.Application':
-                self.mode = "standby"
-                self.application = "settings"
+                self.setMode("standby")
+                self.setApplication("settings")
 
             else:
-                self.mode = "game"
-                self.application = name+"!"+type
+                self.setMode("game")
+                self.setApplication(name+"!"+type)
 
             activeTitles.append(titleStruct)
 
