@@ -6,13 +6,14 @@ from xbox.sg.manager import InputManager, TextManager, MediaManager
 from xbox.stump.manager import StumpManager
 
 from console.state import XboxState
+from api.cache import ApiCache
 
 class Xbox:
     def __init__(self, console = False):
         self._console = console
 
         if console != False:
-            self.state = XboxState()
+            self.state = XboxState(console)
 
     def to_json(self):
         return {
@@ -111,6 +112,9 @@ class Xbox:
         if self._console.connection_state == ConnectionState.Connected:
             print("[Xbox._on_refresh_connection] State is: connected")
             self.state.setConnected(True)
+            ApiCache._activeConnections[self._console.liveid] = False
         else:
             print("[Xbox._on_refresh_connection] State is: disconnected")
             self.state.setConnected(False)
+            if self._console.liveid in ApiCache._activeConnections:
+                del ApiCache._activeConnections[self._console.liveid]

@@ -7,8 +7,9 @@ class ApiCache:
             print('[ApiCache.foundConsole] Console already in cache, ignoring: %s' % console.to_json())
         else:
             print('[ApiCache.foundConsole] Adding console to cache: %s' % console.to_json())
+
+        if console._console.address not in ApiCache._activeConnections:
             console.connect()
-            ApiCache._consoles[console.getName()] = console
 
     def getConsoles(self):
         print('[ApiCache.getConsoles] Getting consoles from cache')

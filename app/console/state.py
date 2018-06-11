@@ -1,10 +1,11 @@
 class XboxState:
-    def __init__(self):
+    def __init__(self, console):
         self.connected = False
         self.active_titles = []
         self.mode = False
         self.application = False
         self.build = False
+        self._console = console
 
     def to_json(self):
         return {
@@ -15,6 +16,10 @@ class XboxState:
 
     def setConnected(self, state):
         self.connected = state
+
+        if state == False:
+            self.setMode('off')
+            self.setApplication('none')
 
     def isConnected(self):
         return self.connected
